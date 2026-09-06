@@ -1,20 +1,40 @@
-# main.py
+from datetime import date
 
-# 1. 상태 준비
-balance = 10000
+current_amount = 10000
+current_id = 0
 records = []
 
-print(f"현재 잔액: {balance}원\n")
+def spend_money(where_used, used_amount, current_amount, records, current_id):
+    current_amount -= used_amount
+    current_id += 1
 
-# 2. 사용자 입력
-item = input("어디에 썼나요?: ")
-amount = int(input("얼마를 썼나요?: "))
+    record = {
+                "id": current_id,
+                "date": str(date.today()),
+                "where": where_used,
+                "amount": used_amount
+        }
+    records.append(record)
 
-# 3. 핵심 연산 & 기록
-balance -= amount
-records.append({"item": item, "amount": amount})
+    return current_amount, current_id
 
-# 4. 결과 확인
-print("\n=== 지출 완료 ===")
-print(f"남은 잔액: {balance}원")
-print("내역 장부:", records)
+
+while True:
+    where_used = input("사용처를 알려주세요: ")
+    if where_used == "x":
+                break
+    used_amount = int(input("사용한 금액을 입력해주세요: "))
+
+    current_amount, current_id = spend_money(
+            where_used, used_amount, current_amount, records, current_id)
+
+print("\n--- 저장된 장부 내역 ---")
+print(records)
+print(f"남은 잔액: {current_amount}원")
+
+def list_transactions(records):
+       for record in records:
+        print(f"[{record['id']}] {record['date']} | {record['where']} | {record['amount']}원")
+
+list_transactions(records)
+print(f"\n남은 잔액: {current_amount}원")
