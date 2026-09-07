@@ -1,0 +1,15 @@
+{"id": 1, "date": "2026-09-07", "transaction_type": "수입", "category": "교육비", "amount": 100000}
+{"id": 1, "date": "2026-09-07", "transaction_type": "수입", "category": "용동", "amount": 10000}
+{"id": 1, "date": "2026-09-07", "transaction_type": "지출", "category": "샌드위치", "amount": 11400}
+{"id": 2, "date": "2026-09-07", "transaction_type": "수입", "category": "알바", "amount": 30000}
+{"id": 3, "date": "2026-09-07", "transaction_type": "지출", "category": "옷", "amount": 728600}
+{"id": 4, "date": "2026-09-07", "transaction_type": "수입", "category": "알바", "amount": 700000}
+{"id": 5, "date": "2026-09-07", "transaction_type": "수입", "category": "용돈", "amount": 50000}
+{"id": 6, "date": "2026-09-07", "transaction_type": "지출", "category": "커피", "amount": 5000}
+{"id": 7, "date": "2026-09-07", "transaction_type": "수입", "category": "커피", "amount": 3000}
+{"id": 8, "date": "2026-09-07", "transaction_type": "수입", "category": "알바", "amount": 10000}
+{"id": 9, "date": "2026-09-07", "transaction_type": "수입", "category": "커피", "amount": 2000}
+{"id": 10, "date": "2026-09-07", "transaction_type": "지출", "category": "옷", "amount": 10000}
+{"id": 11, "date": "2026-09-07", "transaction_type": "수입", "category": "삼겹살", "amount": 30000}
+{"id": 12, "date": "2026-09-07", "transaction_type": "지출", "category": "버스", "amount": 1000}
+{"id": 13, "date": "2026-09-07", "transaction_type": "지출", "category": "김밥", "amount": 1000}
