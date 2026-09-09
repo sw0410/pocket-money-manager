@@ -10,6 +10,7 @@ class transaction :
     category: str
     amount: int
 
+transactions =[]
 
 # 2. 거래 연산 함수 (Transformation)
 def add_transaction(current_amount, current_id, transaction_type, amount):
@@ -26,6 +27,7 @@ def add_transaction(current_amount, current_id, transaction_type, amount):
 # 초기 바닥 상태 (Ground)
 current_amount = 0
 current_id = 0
+
 
 while True:
     transaction_type = input("거래 타입을 입력하세요: ").strip()
@@ -47,12 +49,15 @@ while True:
         except ValueError:
             print("숫자만 입력해주세요. ")
 
-# 통과 후 add_transaction
+    new_transaction = {"date": date.today(), "transaction_type": transaction_type , "amount": amount }
+    transactions.append(new_transaction)
 
-    current_id,current_amount = add_transaction(current_id,current_amount,transaction_type, amount)
+    # 통과 후 add_transaction
+    current_id,current_amount = add_transaction(current_amount,current_id,transaction_type, amount)
     print(f"거래번호: {current_id}, 현재 잔액: {current_amount}")
 
-
+for transaction in transactions:
+    print(transaction['date'], transaction['transaction_type'],transaction['amount'])
 
 
 
