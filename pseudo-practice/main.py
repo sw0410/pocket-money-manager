@@ -2,6 +2,7 @@ import json
 import os
 from dataclasses import asdict, dataclass
 from datetime import date
+import csv
 
 # ==========================================
 # 1. 파일명 상수 및 데이터 구조
@@ -143,7 +144,59 @@ def save_budget(amount):
     with open(BUDGET_FILE, "w", encoding="utf-8") as f:
         f.write(str(amount))
 
+def delete_transaction_by_id(target_id):
+    for tx in transactions:
+        if tx.id == target_id:
+            transactions.remove(tx)
+            return True
+    print("해당 id의 거래를 찾지 못했습니다.")
+    return False
 
+def update_transaction_by_id(target_id,new_amount):
+    for tx in transactions:
+        if tx.id == target_id:
+            tx.amount = new_amount
+            return True
+    print("해당 id의 거래를 찾지 못했습니다.")
+    return False
+
+def save_transactions_safely(filename="transactions.jsonl"):
+    tmp_filename = f"{filename}.tmp"
+    with open(tmp_filename, "w", encoding="utf-8") as f:
+        for tx in transactions:
+            tx_dict = asdict(tx)
+            tx_json = json.dumps(tx_dict, ensure_ascii=False)
+            f.write(tx_json + "\n")
+    os.replace(tmp_filename, filename)
+    print("장부 파일 안전 저장 완료.")
+    return True
+
+def export_to_csv(filename="transactions.csv"):
+    with open(filename, "w", newline="", encoding="utf-8-sig") as f:
+        writer = csv.writer(f)
+        # 1. 헤더 쓰기
+        writer.writerow(["id", "date", "transaction_type", "category", "amount"])
+
+        # 2. 파일이 열려있는 with 안에서 반복문 실행
+        for tx in transactions:
+            writer.writerow(
+                [tx.id, tx.date, tx.transaction_type, tx.category, tx.amount]
+            )
+
+    # 3. 파일 쓰기가 온전히 끝난 후 1번만 출력
+    print(f"{filename} 파일로 내보내기 완료.")
+
+def import_from_csv(filename="transactions.csv"):
+    if not os.path.exists(filename):
+        print(f"{filename}이 존재하지 않습니다.")
+        return
+    else:
+        with open(filename, "r", encoding="utf-8-sig")as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                pass
+
+        
 # ==========================================
 # 3. 프로그램 초기화 및 데이터 세팅
 # ==========================================
@@ -156,9 +209,36 @@ for tx in stream_transaction(FILENAME):
     transactions.append(tx)
     current_id, current_amount = add_transaction(current_amount, current_id, tx)
 
-print(
-    f"시스템 준비 완료: 총 {len(transactions)}건의 거래 복원됨. 현재 잔액: {current_amount}원, 다음 거래번호: {current_id + 1}"
-)
+print(f"시스템 준비 완료: 총 {len(transactions)}건의 거래 복원됨. 현재 잔액: {current_amount}원, 다음 거래번호: {current_id + 1}")
+
+# # === 수정 및 파일 안전 저장 연동 테스트 ===
+# if transactions:
+#     first_tx = transactions[0]
+#     print(f"수정 전 {first_tx.id}번 거래 금액: {first_tx.amount:,}원")
+
+#     # 1. 메모리 데이터 수정
+#     update_transaction_by_id(first_tx.id, 55555)
+
+#     # 2. 변경된 리스트 전체를 파일에 안전하게 저장
+#     save_transactions_safely(FILENAME)
+
+#     print(f"수정 후 {first_tx.id}번 거래 금액: {first_tx.amount:,}원")
+# # ==========================================
+
+
+#  print("삭제 전 거래 건수:", len(transactions))
+#  delete_transaction_by_id(1)  # 1번 거래 삭제 시도
+#   print("삭제 후 거래 건수:", len(transactions))
+
+# # === update_transaction_by_id 테스트 ===
+# if transactions:
+#     first_tx = transactions[0]
+#     print(f"수정 전 {first_tx.id}번 거래 금액: {first_tx.amount:,}원")
+
+#     update_transaction_by_id(first_tx.id, 77777)  # 77,777원으로 변경 시도
+
+#     print(f"수정 후 {first_tx.id}번 거래 금액: {first_tx.amount:,}원")
+# # =======================================
 
 # [2] 카테고리 로드 및 기본값 세팅
 load_categories()
@@ -180,47 +260,77 @@ if monthly_budget == 0:
 # 4. 메인 거래 입력 루프
 # ==========================================
 while True:
-    transaction_type = input("거래 타입을 입력하세요: ").strip()
-    if transaction_type == "":
+    menu = input("메뉴를 선택하세요 (1.등록 / 2.수정 / 3.삭제 / 4.내보내기 / Enter=종료): ").strip()
+    if menu == "":
         break
-    if transaction_type not in ["수입", "지출"]:
-        print("수입 또는 지출만 입력해주세요")
-        continue
 
-    chosen_cat = select_category()
-    category = chosen_cat.name
+    # 1. 등록 분기 
+    if menu == "1":
+        transaction_type = input("거래 타입을 입력하세요 (수입/지출): ").strip()
+        if transaction_type not in ["수입", "지출"]:
+            print("수입 또는 지출만 입력해주세요.")
+            continue
 
-    while True:
-        amount = input("금액을 입력해주세요: ")
+        chosen_cat = select_category()
+        category = chosen_cat.name
+
+        while True:
+            amount = input("금액을 입력해주세요: ")
+            try:
+                amount = int(amount)
+                if amount > 0:
+                    break
+                else:
+                    print("0보다 큰 숫자만 입력해주세요.")
+            except ValueError:
+                print("숫자만 입력해주세요.")
+
+        tx = Transaction(
+            id=current_id + 1,
+            date=str(date.today()),
+            transaction_type=transaction_type,
+            category=category,
+            amount=amount,
+        )
+
+        current_id, current_amount = add_transaction(current_amount, current_id, tx)
+        transactions.append(tx)
+
+        # JSONL 파일 영구 저장
+        tx_dict = asdict(tx)
+        tx_json = json.dumps(tx_dict, ensure_ascii=False)
+        with open(FILENAME, "a", encoding="utf-8") as f:
+            f.write(tx_json + "\n")
+
+        print(f"거래번호: {current_id}, 현재잔액: {current_amount}원 (등록 완료)")
+
+    # 2. 수정 분기
+    elif menu == "2":
         try:
-            amount = int(amount)
-            if amount > 0:
-                break
-            else:
-                print("0보다 큰 숫자만 입력해주세요.")
+            target_id = int(input("수정할 거래 번호(ID)를 입력하세요: "))
+            new_amount = int(input("변경할 새 금액을 입력하세요: "))
+            if update_transaction_by_id(target_id, new_amount):
+                save_transactions_safely(FILENAME)
         except ValueError:
             print("숫자만 입력해주세요.")
 
-    # 거래 생성 및 연산 반영
-    tx = Transaction(
-        id=current_id + 1,
-        date=str(date.today()),
-        transaction_type=transaction_type,
-        category=category,
-        amount=amount,
-    )
+    # 3. 삭제 분기
+    elif menu == "3":
+        try:
+            target_id = int(input("삭제할 거래 번호(ID)를 입력하세요: "))
+            if delete_transaction_by_id(target_id):
+                save_transactions_safely(FILENAME)
+        except ValueError:
+            print("숫자(ID)만 입력해주세요.")
 
-    current_id, current_amount = add_transaction(current_amount, current_id, tx)
-    transactions.append(tx)
-
-    # JSONL 파일 영구 저장
-    tx_dict = asdict(tx)
-    tx_json = json.dumps(tx_dict, ensure_ascii=False)
-    with open(FILENAME, "a", encoding="utf-8") as f:
-        f.write(tx_json + "\n")
-
-    print(f"거래번호: {current_id}, 현재잔액: {current_amount} (파일 저장 완료)")
-
+    # 4. 내보내기 분기 
+    elif menu == "4":
+        export_to_csv()
+        continue
+        
+    # 1, 2, 3 외의 잘못된 입력 처리
+    else:
+        print("1, 2, 3, 4 중 하나를 입력하거나 엔터를 눌러 종료하세요.\n")
 
 # ==========================================
 # 5. 프로그램 종료 후 통계 집계
@@ -245,3 +355,5 @@ for tx in transactions:
 print(f"총 수입: {total_income:,}원")
 print(f"총 지출: {total_expense:,}원")
 print(f"순 잔액(수입 - 지출): {total_income - total_expense:,}원")
+
+import_from_csv()

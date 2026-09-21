@@ -1,5 +1,4 @@
-{"id": 1, "date": "2026-09-14", "transaction_type": "수입", "category": "알바", "amount": 100000}
-{"id": 2, "date": "2026-09-14", "transaction_type": "수입", "category": "알바", "amount": 150000}
+{"id": 2, "date": "2026-09-14", "transaction_type": "수입", "category": "알바", "amount": 500}
 {"id": 3, "date": "2026-09-15", "transaction_type": "수입", "category": "음식", "amount": 260000}
 {"id": 4, "date": "2026-09-15", "transaction_type": "수입", "category": "음식", "amount": 520000}
 {"id": 5, "date": "2026-09-15", "transaction_type": "지출", "category": "30000", "amount": 1010000}
@@ -20,3 +19,4 @@
 {"id": 19, "date": "2026-09-15", "transaction_type": "수입", "category": "식비", "amount": 500}
 {"id": 21, "date": "2026-09-15", "transaction_type": "수입", "category": "교통", "amount": 10000}
 {"id": 22, "date": "2026-09-15", "transaction_type": "지출", "category": "식비", "amount": 100000}
+{"id": 23, "date": "2026-09-21", "transaction_type": "수입", "category": "식비", "amount": 20000}
