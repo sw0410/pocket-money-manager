@@ -356,5 +356,3 @@ $ python -m budget_app add
 ```
 
 ---
-
-*이 문서는 `budget_app` 프로젝트의 공식 README이며, 과제 제출 및 포트폴리오 자료로 활용할 수 있도록 작성되었습니다.*
