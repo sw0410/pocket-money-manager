@@ -356,3 +356,100 @@ $ python -m budget_app add
 ```
 
 ---
+
+
+```mermaid
+flowchart TD
+
+    subgraph SG0["👤 손님석"]
+        User["👤 User<br/>터미널에서 명령어 실행<br/>예: add, list, report"]
+    end
+
+    subgraph SG1["🤵 홀 (cli.py — 웨이터)"]
+        CLI["🤵 CLI 모듈<br/>argparse / input() 처리<br/>결과 테이블 화면 출력"]
+    end
+
+    subgraph SG2["👨‍🍳 주방 (services.py — 셰프)"]
+        Services["👨‍🍳 Services 모듈<br/>금액·카테고리 유효성 검사<br/>월별 통계 · 예산 초과율 계산"]
+    end
+
+    subgraph SG3["📦 창고 (storage.py — 창고 관리자)"]
+        Storage["📦 Storage 모듈<br/>파일 I/O 전담 (yield 스트리밍)<br/>.tmp + os.replace 원자적 쓰기"]
+    end
+
+    subgraph SG4["🧊 냉장고 (data/*.jsonl — 디스크)"]
+        direction TB
+        DiskT["🧾 transactions.jsonl"]
+        DiskC["🏷️ categories.jsonl"]
+        DiskB["💰 budgets.jsonl"]
+    end
+
+    subgraph SG5["📋 메뉴판 & 재료 규격서 (models.py)"]
+        Models["📋 @dataclass 규격<br/>Transaction / Category / Budget<br/>모든 계층이 공통 참조"]
+    end
+
+    subgraph SG6["🛠️ 매니저 (decorators.py)"]
+        Decorators["🛠️ 예외 처리 데코레이터<br/>스택트레이스 숨김 · 친절한 힌트<br/>sys.exit(1) 관리"]
+    end
+
+    %% ===== 🔵 입력(요청) 흐름 — 0~5번 =====
+    User -->|"1. 명령 입력"| CLI
+    CLI -->|"2. 주문 전달"| Services
+    Services -->|"3. 재료 요청"| Storage
+    Storage -->|"4. 파일 읽기/쓰기"| DiskT
+    Storage -->|"4. 파일 읽기/쓰기"| DiskC
+    Storage -->|"4. 파일 읽기/쓰기"| DiskB
+
+    %% ===== 🟠 출력(결과) 흐름 — 6~11번 =====
+    DiskT -.->|"5. 재료 반환"| Storage
+    DiskC -.->|"5. 재료 반환"| Storage
+    DiskB -.->|"5. 재료 반환"| Storage
+    Storage -.->|"6. 결과 반환"| Services
+    Services -.->|"7. 화면 출력용 결과"| CLI
+    CLI -.->|"7. 화면 출력"| User
+
+    %% ===== ⚪ 공통 참조 / 예외 처리 — 12~16번 (화살표로 방향 명시) =====
+    CLI -.->|"참고"| Models
+    Services -.->|"참고"| Models
+    Storage -.->|"참고"| Models
+    Decorators -.->|"오류 개입"| CLI
+    Decorators -.->|"오류 개입"| Services
+
+    %% ===== 범례 =====
+    subgraph LEGEND["🗂️ 범례"]
+        direction LR
+        L1[" "] -->|"🔵 입력(요청) 흐름"| L2[" "]
+        L3[" "] -.->|"🟠 출력(결과) 흐름"| L4[" "]
+        L5[" "] -.->|"⚪ 참조/개입"| L6[" "]
+    end
+
+    classDef userStyle fill:#FFF3CD,stroke:#FFB300,stroke-width:2px;
+    classDef hallStyle fill:#D6EAF8,stroke:#2E86C1,stroke-width:2px;
+    classDef kitchenStyle fill:#D5F5E3,stroke:#28B463,stroke-width:2px;
+    classDef storageStyle fill:#FADBD8,stroke:#CB4335,stroke-width:2px;
+    classDef diskStyle fill:#E8DAEF,stroke:#8E44AD,stroke-width:2px;
+    classDef modelStyle fill:#FDEBD0,stroke:#CA6F1E,stroke-width:2px,stroke-dasharray: 4 4;
+    classDef managerStyle fill:#F2F3F4,stroke:#616A6B,stroke-width:2px,stroke-dasharray: 3 3;
+    classDef legendNode fill:none,stroke:none;
+
+    class User userStyle
+    class CLI hallStyle
+    class Services kitchenStyle
+    class Storage storageStyle
+    class DiskT,DiskC,DiskB diskStyle
+    class Models modelStyle
+    class Decorators managerStyle
+    class L1,L2,L3,L4,L5,L6 legendNode
+
+    %% ===== 링크 색상 지정 (인덱스 순서: 위 화살표 정의 순서와 동일) =====
+    linkStyle 0,1,2,3,4,5 stroke:#2E86C1,stroke-width:3px;
+    linkStyle 6,7,8,9,10,11 stroke:#E67E22,stroke-width:3px;
+    linkStyle 12,13,14,15,16 stroke:#95A5A6,stroke-width:1.5px;
+    linkStyle 17,18,19 stroke:#2E86C1,stroke-width:3px;
+    linkStyle 20,21 stroke:#E67E22,stroke-width:3px;
+    linkStyle 22,23 stroke:#95A5A6,stroke-width:1.5px;
+```
+**색상 규칙 정리**
+- 🔵 **파란 실선 (0~5번)**: 손님 → 웨이터 → 셰프 → 창고 → 냉장고로 내려가는 **"요청" 흐름** (상위→하위 단방향 의존성)
+- 🟠 **주황 점선 (6~11번)**: 냉장고 → 창고 → 셰프 → 웨이터 → 손님으로 올라오는 **"결과" 흐름** (새로운 의존성이 아니라 함수의 리턴값)
+- ⚪ **회색 점선 (12~16번)**: 모든 계층이 공통으로 참조하는 규격서(Models)와, 예외 발생 시 개입하는 매니저(Decorators)
