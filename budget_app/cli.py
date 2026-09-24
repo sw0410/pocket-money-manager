@@ -1,4 +1,4 @@
-# budget_app/cli.py
+# 사용자 입력 수용 및 화면 출력
 import argparse
 import sys
 from datetime import date

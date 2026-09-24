@@ -1,4 +1,4 @@
-# budget_app/storage.py
+# 파일 영구 저장 및 입출력 (JSONL 쓰기/읽기)
 import json
 import os
 from dataclasses import asdict

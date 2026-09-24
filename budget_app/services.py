@@ -1,4 +1,4 @@
-# budget_app/services.py
+# 업무 규칙 및 계산 (검증, 통계 연산, 참조 무결성 확인)
 import csv
 from datetime import datetime
 from typing import Any, Dict, Generator, List, Optional, Tuple
