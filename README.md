@@ -452,3 +452,26 @@ flowchart TD
 | 🔵 파랑 굵은 실선 | 0~5 | 입력(요청) | 손님 → 웨이터 → 셰프 → 창고 → 냉장고 |
 | 🟠 주황 점선 | 6~11 | 출력(결과) | 냉장고 → 창고 → 셰프 → 웨이터 → 손님 |
 | ⚪ 회색 얇은 점선 | 12~16 | 참조/개입 | 각 계층 → 메뉴판, 매니저 → 웨이터/셰프 |
+
+
+
+## 💡 CLI 조작법 요약
+
+모든 명령어는 프로젝트 루트에서 `python -m budget_app <command> [options]` 형식으로 실행합니다.
+
+| 서브커맨드 | 주요 옵션 / 인자 | 입력 방식 | 실행 명령어 예시 | 비고 / 주의사항 |
+| :--- | :--- | :---: | :--- | :--- |
+| **`add`** | 없음 | 대화형 | `python -m budget_app add` | 날짜 미입력 시 오늘 자동 지정, 카테고리 사전 검증 |
+| **`list`** | `--limit <N>` | 옵션 | `python -m budget_app list --limit 10` | 기본값 20건, 최신순 정렬 및 스트리밍 출력 |
+| **`update`** | `--id <ID>` (필수)<br>`--date`, `--type`, `--category`<br>`--amount`, `--memo`, `--tags` | 옵션 | `python -m budget_app update --id 1 --amount 15000` | 미존재 ID 입력 시 에러 반환, 변경할 항목만 선택 전달 |
+| **`delete`** | `--id <ID>` (필수) | 옵션 | `python -m budget_app delete --id 1` | 미존재 ID 입력 시 에러 반환 (Exit Code: 1) |
+| **`search`** | `--from`, `--to`, `--category`<br>`--type`, `--q`, `--tag` | 옵션 | `python -m budget_app search --category 식비 --q 점심` | 다중 조건 AND 필터링, 최신순 정렬 출력 |
+| **`summary`** | `--month <YYYY-MM>` (필수)<br>`--top <N>` | 옵션 | `python -m budget_app summary --month 2026-09 --top 3` | 수입/지출/잔액 집계, 카테고리 TOP N, 예산 사용률 연동 |
+| **`budget`** | `set --month <YYYY-MM>`<br>`--amount <금액>` | 하위명령 / 옵션 | `python -m budget_app budget set --month 2026-09 --amount 500000` | `budgets.jsonl`에 영구 보존, 월별 목표 지출 설정 |
+| **`category`** | `list`<br>`add <이름>`<br>`remove --id <ID>` | 하위명령 / 옵션 | `python -m budget_app category list`<br>`python -m budget_app category add 여가비`<br>`python -m budget_app category remove --id 5` | 사용 중인 카테고리는 삭제 차단 (참조 무결성 보호) |
+| **`export`** | `--out <파일>` (필수)<br>`--month` 또는 `--from`/`--to` | 옵션 | `python -m budget_app export --out backup.csv --month 2026-09` | 기간/월 조건 중 1개 이상 필수, UTF-8 (`utf-8-sig`) |
+| **`import`** | `--from <파일>` (필수) | 옵션 | `python -m budget_app import --from backup.csv` | 행 단위 검증, 미등록 카테고리 자동 추가, 건수 집계 |
+
+> **전역 공통 옵션**
+> * `--help`: 전체 명령어 또는 각 서브커맨드 세부 옵션 도움말 출력
+> * `--data-dir <디렉터리경로>`: 데이터 파일 저장 경로 변경 (기본값: `./data`)
