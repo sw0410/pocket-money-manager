@@ -1,4 +1,4 @@
-# budget_app/decorators.py
+# 명령줄 인터페이스 예외 처리 데코레이터
 import sys
 from functools import wraps
 from typing import Callable, Any
@@ -17,12 +17,12 @@ def handle_cli_errors(func: Callable) -> Callable:
         try:
             return func(*args, **kwargs)
         except ValueError as e:
-            # 비즈니스 로직(Services)에서 의도적으로 발생시킨 예외 (검증 실패 등)
+            # 서비스 로직에서 의도적으로 발생시킨 예외(검증 실패 등)
             print(f"\n[오류] 잘못된 입력입니다.\n원인: {e}", file=sys.stderr)
             print("해결 힌트: --help 옵션을 사용하여 명령어의 올바른 형식을 확인하거나 입력값을 다시 확인해 주세요.", file=sys.stderr)
             sys.exit(1)
         except FileNotFoundError as e:
-            # 파일 경로 관련 예외
+            # 파일 경로와 관련된 예외
             print(f"\n[오류] 파일을 찾을 수 없습니다.\n원인: {e}", file=sys.stderr)
             print("해결 힌트: 파일 경로가 올바른지, 폴더에 대한 읽기/쓰기 권한이 있는지 확인해 주세요.", file=sys.stderr)
             sys.exit(1)
@@ -31,7 +31,7 @@ def handle_cli_errors(func: Callable) -> Callable:
             print("\n[알림] 사용자에 의해 프로그램이 중단되었습니다.")
             sys.exit(130)  # 리눅스 표준 Ctrl+C 종료 코드
         except Exception as e:
-            # 기타 예상치 못한 치명적 예외
+            # 그 밖의 예상하지 못한 치명적 예외
             print(f"\n[시스템 오류] 예기치 않은 문제가 발생했습니다.\n원인: {e}", file=sys.stderr)
             print("해결 힌트: 프로그램 로그를 확인하거나 개발자에게 문의해 주세요.", file=sys.stderr)
             sys.exit(1)
