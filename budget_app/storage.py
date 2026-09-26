@@ -8,7 +8,7 @@ from budget_app.models import Budget, Category, Transaction
 
 
 class Storage:
-    """데이터 영속성 및 파일 I/O를 전담하는 저장소 클래스"""
+    """데이터 영속성 및 파일 입출력을 전담하는 저장소 클래스"""
 
     def __init__(self, data_dir: str = "./data"):
         self.data_dir = data_dir
@@ -18,14 +18,14 @@ class Storage:
         self.budget_file = os.path.join(self.data_dir, "budgets.jsonl")
 
     def _atomic_write_jsonl(self, filepath: str, items: Iterable[dict]) -> None:
-        """임시 파일(.tmp)에 기록 후 교체(Atomic Write)하여 쓰기 도중 충돌 시 원본을 보존합니다."""
+        """임시 파일(.tmp)에 기록 후 교체하여 쓰기 도중 충돌 시 원본을 보존합니다."""
         tmp_file = f"{filepath}.tmp"
         with open(tmp_file, "w", encoding="utf-8") as f:
             for item in items:
                 f.write(json.dumps(item, ensure_ascii=False) + "\n")
         os.replace(tmp_file, filepath)
 
-    # --- 거래 내역 (Transactions) ---
+    # --- 거래 내역 ---
 
     def stream_transactions(self) -> Generator[Transaction, None, None]:
         """거래 내역 전체를 한 줄씩 제너레이터로 스트리밍 반환합니다."""
@@ -40,7 +40,7 @@ class Storage:
                 yield Transaction(**data)
 
     def append_transaction(self, tx: Transaction) -> None:
-        """새 단일 거래를 파일 끝에 즉시 덧붙입니다 (O(1) 속도)."""
+        """새 단일 거래를 파일 끝에 즉시 덧붙입니다 (상수 시간)."""
         with open(self.tx_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(asdict(tx), ensure_ascii=False) + "\n")
 
@@ -50,7 +50,7 @@ class Storage:
             self.tx_file, (asdict(tx) for tx in transactions)
         )
 
-    # --- 카테고리 (Categories) ---
+    # --- 카테고리 ---
 
     def load_categories(self) -> List[Category]:
         """카테고리 전체 목록을 불러옵니다."""
@@ -71,7 +71,7 @@ class Storage:
             self.cat_file, (asdict(c) for c in categories)
         )
 
-    # --- 예산 (Budgets) ---
+    # --- 예산 ---
 
     def load_budgets(self) -> List[Budget]:
         """월별 예산 전체 목록을 불러옵니다."""
