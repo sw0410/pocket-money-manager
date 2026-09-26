@@ -6,7 +6,49 @@ from typing import Any, Dict, Generator, List, Optional, Tuple
 from budget_app.models import Budget, Category, Transaction
 from budget_app.storage import Storage
 
+
 CSV_HEADERS = ["date", "type", "category", "amount", "memo", "tags"]
+
+
+def validate_date(date_str: str) -> None:
+    """날짜가 YYYY-MM-DD 형식인지 검증합니다."""
+    try:
+        datetime.strptime(date_str, "%Y-%m-%d")
+    except ValueError:
+        raise ValueError("날짜 형식은 YYYY-MM-DD 이어야 합니다.")
+
+
+def validate_month(month: str) -> None:
+    """월이 YYYY-MM 형식인지 검증합니다."""
+    try:
+        datetime.strptime(month, "%Y-%m")
+    except ValueError:
+        raise ValueError("월 형식은 YYYY-MM 이어야 합니다.")
+
+
+def normalize_transaction_type(tx_type: str) -> str:
+    """거래 타입을 정규화하고 검증합니다."""
+    normalized = tx_type.strip().lower()
+    if normalized not in {"income", "expense"}:
+        raise ValueError("거래 타입은 'income' 또는 'expense' 이어야 합니다.")
+    return normalized
+
+
+def parse_tags(tags_raw: str) -> List[str]:
+    """쉼표로 구분된 태그 문자열을 목록으로 변환합니다."""
+    if not tags_raw:
+        return []
+    return [tag.strip() for tag in tags_raw.split(",") if tag.strip()]
+
+
+def clean_tag_list(tags: Optional[List[str]]) -> List[str]:
+    """태그 목록의 공백을 제거하고 빈 태그를 제외합니다."""
+    return [tag.strip() for tag in (tags or []) if tag.strip()]
+
+
+def sort_transactions(transactions: List[Transaction]) -> List[Transaction]:
+    """거래를 날짜와 ID 기준으로 최신순 정렬합니다."""
+    return sorted(transactions, key=lambda tx: (tx.date, tx.id), reverse=True)
 
 
 class BudgetService:
@@ -34,12 +76,12 @@ class BudgetService:
         name = name.strip()
         if not name:
             raise ValueError("카테고리 이름은 비어 있을 수 없습니다.")
-        
+
         cats = self.storage.load_categories()
         if any(c.name == name for c in cats):
             raise ValueError(f"이미 존재하는 카테고리입니다: {name}")
 
-        next_id = max([c.id for c in cats], default=0) + 1
+        next_id = max((c.id for c in cats), default=0) + 1
         new_cat = Category(id=next_id, name=name)
         cats.append(new_cat)
         self.storage.save_categories(cats)
@@ -52,7 +94,6 @@ class BudgetService:
         if not target:
             raise ValueError(f"ID {cat_id}에 해당하는 카테고리가 존재하지 않습니다.")
 
-        # 참조 무결성 검사
         for tx in self.storage.stream_transactions():
             if tx.category == target.name:
                 raise ValueError(
@@ -74,32 +115,19 @@ class BudgetService:
         tags: Optional[List[str]] = None,
     ) -> Transaction:
         """단일 거래를 유효성 검증 후 등록합니다."""
-        # 1. 날짜 검증
-        try:
-            datetime.strptime(date_str, "%Y-%m-%d")
-        except ValueError:
-            raise ValueError("날짜 형식은 YYYY-MM-DD 이어야 합니다.")
+        validate_date(date_str)
+        tx_type = normalize_transaction_type(tx_type)
 
-        # 2. 거래 타입 검증
-        tx_type = tx_type.strip().lower()
-        if tx_type not in ["income", "expense"]:
-            raise ValueError("거래 타입은 'income' 또는 'expense' 이어야 합니다.")
-
-        # 3. 금액 검증
         if amount <= 0:
             raise ValueError("금액은 0보다 큰 정수여야 합니다.")
 
-        # 4. 카테고리 등록 여부 검증
         valid_cats = {c.name for c in self.storage.load_categories()}
         if category not in valid_cats:
             raise ValueError(
                 f"등록되지 않은 카테고리입니다: '{category}'. 등록된 목록: {list(valid_cats)}"
             )
 
-        # 5. ID 채번
-        all_ids = [tx.id for tx in self.storage.stream_transactions()]
-        next_id = max(all_ids, default=0) + 1
-
+        next_id = max((tx.id for tx in self.storage.stream_transactions()), default=0) + 1
         new_tx = Transaction(
             id=next_id,
             date=date_str,
@@ -107,15 +135,14 @@ class BudgetService:
             category=category,
             amount=amount,
             memo=memo.strip(),
-            tags=[t.strip() for t in (tags or []) if t.strip()],
+            tags=clean_tag_list(tags),
         )
         self.storage.append_transaction(new_tx)
         return new_tx
 
     def list_transactions(self, limit: Optional[int] = None) -> List[Transaction]:
         """거래 내역을 최신순(날짜 내림차순, ID 내림차순)으로 반환합니다."""
-        txs = list(self.storage.stream_transactions())
-        txs.sort(key=lambda x: (x.date, x.id), reverse=True)
+        txs = sort_transactions(list(self.storage.stream_transactions()))
         if limit is not None and limit > 0:
             return txs[:limit]
         return txs
@@ -137,15 +164,11 @@ class BudgetService:
             raise ValueError(f"ID {tx_id}에 해당하는 거래를 찾을 수 없습니다.")
 
         tx = all_txs[target_idx]
-
         if "date" in fields and fields["date"]:
-            datetime.strptime(fields["date"], "%Y-%m-%d")
+            validate_date(fields["date"])
             tx.date = fields["date"]
         if "type" in fields and fields["type"]:
-            t_type = fields["type"].strip().lower()
-            if t_type not in ["income", "expense"]:
-                raise ValueError("거래 타입은 'income' 또는 'expense' 이어야 합니다.")
-            tx.type = t_type
+            tx.type = normalize_transaction_type(fields["type"])
         if "category" in fields and fields["category"]:
             valid_cats = {c.name for c in self.storage.load_categories()}
             if fields["category"] not in valid_cats:
@@ -156,10 +179,10 @@ class BudgetService:
             if amt <= 0:
                 raise ValueError("금액은 0보다 커야 합니다.")
             tx.amount = amt
-        if "memo" in fields:
+        if "memo" in fields and fields["memo"] is not None:
             tx.memo = fields["memo"].strip()
         if "tags" in fields and fields["tags"] is not None:
-            tx.tags = [t.strip() for t in fields["tags"] if t.strip()]
+            tx.tags = clean_tag_list(fields["tags"])
 
         self.storage.save_all_transactions(all_txs)
         return tx
@@ -182,36 +205,29 @@ class BudgetService:
                 continue
             if category and tx.category != category:
                 continue
-            if tx_type and tx.type != tx_type.strip().lower():
+            if tx_type and tx.type != normalize_transaction_type(tx_type):
                 continue
-            if q and (q.lower() not in tx.memo.lower()):
+            if q and q.lower() not in tx.memo.lower():
                 continue
-            if tag and (tag not in tx.tags):
+            if tag and tag not in tx.tags:
                 continue
             results.append(tx)
-
-        results.sort(key=lambda x: (x.date, x.id), reverse=True)
-        return results
+        return sort_transactions(results)
 
     # --- 예산 및 요약 ---
 
     def set_budget(self, month: str, amount: int) -> Budget:
         """특정 월(YYYY-MM)의 예산을 설정합니다."""
-        try:
-            datetime.strptime(month, "%Y-%m")
-        except ValueError:
-            raise ValueError("월 형식은 YYYY-MM 이어야 합니다.")
+        validate_month(month)
         if amount <= 0:
             raise ValueError("예산 금액은 0보다 커야 합니다.")
 
         budgets = self.storage.load_budgets()
-        updated = False
-        for b in budgets:
-            if b.month == month:
-                b.amount = amount
-                updated = True
+        for budget in budgets:
+            if budget.month == month:
+                budget.amount = amount
                 break
-        if not updated:
+        else:
             budgets.append(Budget(month=month, amount=amount))
 
         self.storage.save_budgets(budgets)
@@ -219,30 +235,18 @@ class BudgetService:
 
     def get_summary(self, month: str, top_n: int = 5) -> Dict[str, Any]:
         """특정 월의 수입, 지출, 카테고리별 지출 TOP N, 예산 대비 분석 요약을 반환합니다."""
-        try:
-            datetime.strptime(month, "%Y-%m")
-        except ValueError:
-            raise ValueError("월 형식은 YYYY-MM 이어야 합니다.")
-
+        validate_month(month)
         month_txs = [tx for tx in self.storage.stream_transactions() if tx.date.startswith(month)]
 
         total_income = sum(tx.amount for tx in month_txs if tx.type == "income")
         total_expense = sum(tx.amount for tx in month_txs if tx.type == "expense")
-        balance = total_income - total_expense
-
-        # 카테고리별 지출 집계
         expense_by_cat: Dict[str, int] = {}
         for tx in month_txs:
             if tx.type == "expense":
                 expense_by_cat[tx.category] = expense_by_cat.get(tx.category, 0) + tx.amount
 
-        # TOP N 정렬
-        sorted_cats = sorted(expense_by_cat.items(), key=lambda item: item[1], reverse=True)[:top_n]
-
-        # 예산 조회
         budgets = self.storage.load_budgets()
         target_budget = next((b for b in budgets if b.month == month), None)
-
         usage_rate = None
         is_over = False
         if target_budget and target_budget.amount > 0:
@@ -251,11 +255,11 @@ class BudgetService:
 
         return {
             "month": month,
-            "has_data": len(month_txs) > 0,
+            "has_data": bool(month_txs),
             "total_income": total_income,
             "total_expense": total_expense,
-            "balance": balance,
-            "top_categories": sorted_cats,
+            "balance": total_income - total_expense,
+            "top_categories": sorted(expense_by_cat.items(), key=lambda item: item[1], reverse=True)[:top_n],
             "budget": target_budget.amount if target_budget else None,
             "usage_rate": usage_rate,
             "is_over_budget": is_over,
@@ -282,21 +286,13 @@ class BudgetService:
             writer = csv.writer(f)
             writer.writerow(CSV_HEADERS)
             for tx in results:
-                writer.writerow([
-                    tx.date,
-                    tx.type,
-                    tx.category,
-                    tx.amount,
-                    tx.memo,
-                    ",".join(tx.tags),
-                ])
+                writer.writerow([tx.date, tx.type, tx.category, tx.amount, tx.memo, ",".join(tx.tags)])
         return len(results)
 
     def import_csv(self, filepath: str) -> Tuple[int, int]:
         """CSV 파일에서 거래를 읽어 유효한 행만 추가 등록합니다. (성공 수, 실패 수 반환)"""
         success_count = 0
         skip_count = 0
-
         with open(filepath, "r", encoding="utf-8-sig") as f:
             reader = csv.DictReader(f)
             for row in reader:
@@ -306,14 +302,11 @@ class BudgetService:
                     category = row["category"].strip()
                     amount = int(row["amount"].strip())
                     memo = row.get("memo", "").strip()
-                    tags_raw = row.get("tags", "").strip()
-                    tags = [t.strip() for t in tags_raw.split(",") if t.strip()] if tags_raw else []
+                    tags = parse_tags(row.get("tags", "").strip())
 
-                    # 카테고리가 없으면 자동 등록
                     cats = {c.name for c in self.storage.load_categories()}
                     if category not in cats:
                         self.add_category(category)
-
                     self.add_transaction(
                         date_str=date_str,
                         tx_type=tx_type,
@@ -325,5 +318,4 @@ class BudgetService:
                     success_count += 1
                 except Exception:
                     skip_count += 1
-
         return success_count, skip_count
