@@ -1,4 +1,4 @@
-# budget_app/models.py
+# 데이터 모델 정의
 from dataclasses import dataclass, field
 from typing import List
 
