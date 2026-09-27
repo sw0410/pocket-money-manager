@@ -1,9 +1,9 @@
 # budget_app/storage.py
-import csv  # <-- 1. csv 모듈 추가
+import csv
 import json
 import os
 from dataclasses import asdict
-from typing import Any, Dict, Generator, Iterable, List
+from typing import Iterable, Iterator, List
 
 from budget_app.models import Budget, Category, Transaction
 
@@ -28,10 +28,11 @@ class Storage:
             for item in items:
                 f.write(json.dumps(item, ensure_ascii=False) + "\n")
         os.replace(tmp_file, filepath)
+
     # --- 거래 내역 ---
 
-    def stream_transactions(self) -> Generator[Transaction, None, None]:
-        """거래 내역 전체를 한 줄씩 제너레이터로 스트리밍 반환합니다."""
+    def stream_transactions(self) -> Iterator[Transaction]:
+        """거래 내역을 한 줄씩 읽어 반환합니다."""
         if not os.path.exists(self.tx_file):
             return
         with open(self.tx_file, "r", encoding="utf-8") as f:
@@ -43,7 +44,7 @@ class Storage:
                 yield Transaction(**data)
 
     def append_transaction(self, tx: Transaction) -> None:
-        """새 단일 거래를 파일 끝에 즉시 덧붙입니다 (상수 시간)."""
+        """새 단일 거래를 파일 끝에 즉시 덧붙입니다."""
         with open(self.tx_file, "a", encoding="utf-8") as f:
             f.write(json.dumps(asdict(tx), ensure_ascii=False) + "\n")
 
@@ -95,7 +96,7 @@ class Storage:
             self.budget_file, (asdict(b) for b in budgets)
         )
 
-    # --- CSV 입출력 (Storage 전담 책임으로 신설) ---
+    # --- CSV 입출력 ---
 
     def export_transactions_csv(self, filepath: str, transactions: Iterable[Transaction]) -> int:
         """거래 목록을 받아 물리 CSV 파일(utf-8-sig)로 기록합니다."""
@@ -108,8 +109,8 @@ class Storage:
                 count += 1
         return count
 
-    def read_transactions_csv(self, filepath: str) -> Generator[Dict[str, str], None, None]:
-        """물리 CSV 파일에서 한 줄씩 Dict 형태로 스트리밍 읽기를 수행합니다."""
+    def read_transactions_csv(self, filepath: str) -> Iterator[dict[str, str]]:
+        """물리 CSV 파일에서 한 줄씩 Dict 형태로 읽어옵니다."""
         if not os.path.exists(filepath):
             raise FileNotFoundError(f"파일을 찾을 수 없습니다: {filepath}")
         with open(filepath, "r", encoding="utf-8-sig") as f:
