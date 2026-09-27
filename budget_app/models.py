@@ -11,7 +11,7 @@ class Transaction:
     - id: 고유 식별자 (양의 정수)
     - type: 거래 유형 ('income' 또는 'expense')
     - date: 거래 일자 (YYYY-MM-DD)
-    - amount: 거래 금액 (양의 정수)
+    - amount: 거래 금액 (양의 정₩수)
     - category: 카테고리명
     - memo: 선택 메모 (기본값: 빈 문자열)
     - tags: 태그 목록 (기본값: 빈 리스트)
@@ -23,7 +23,6 @@ class Transaction:
     category: str
     memo: str = ""
     tags: List[str] = field(default_factory=list)
-
 
 @dataclass
 class Category:

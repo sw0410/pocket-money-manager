@@ -137,6 +137,7 @@ class BudgetService:
             memo=memo.strip(),
             tags=clean_tag_list(tags),
         )
+        # storage를 주입받아 사용하며, 직접 open() 하지 않고 물리 저장을 위임함
         self.storage.append_transaction(new_tx)
         return new_tx
 

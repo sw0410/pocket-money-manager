@@ -28,7 +28,6 @@ class Storage:
             for item in items:
                 f.write(json.dumps(item, ensure_ascii=False) + "\n")
         os.replace(tmp_file, filepath)
-
     # --- 거래 내역 ---
 
     def stream_transactions(self) -> Generator[Transaction, None, None]:

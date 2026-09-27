@@ -66,11 +66,31 @@ def create_parser() -> argparse.ArgumentParser:
     c_remove = c_subs.add_parser("remove", help="카테고리 삭제")
     c_remove.add_argument("--id", type=int, required=True, help="삭제할 카테고리 ID")
 
+
     exp_p = subparsers.add_parser("export", help="조건에 맞는 거래를 CSV로 내보냅니다.")
-    exp_p.add_argument("--out", required=True, help="저장할 CSV 파일 경로")
-    exp_p.add_argument("--month", help="내보낼 대상 월 (YYYY-MM)")
-    exp_p.add_argument("--from", dest="from_date", help="시작 날짜 (YYYY-MM-DD)")
-    exp_p.add_argument("--to", dest="to_date", help="종료 날짜 (YYYY-MM-DD)")
+    exp_p.add_argument(
+        "--out",
+        metavar="FILEPATH",
+        required=True,
+        help="저장할 CSV 파일 경로 (예: backup.csv)",
+    )
+    exp_p.add_argument(
+        "--month",
+        metavar="YYYY-MM",
+        help="내보낼 대상 월 (예: 2026-09) [조건 1: 기간 미지정 시 필수]",
+    )
+    exp_p.add_argument(
+        "--from",
+        dest="from_date",
+        metavar="YYYY-MM-DD",
+        help="시작 날짜 (예: 2026-09-01) [조건 2: --to와 함께 지정]",
+    )
+    exp_p.add_argument(
+        "--to",
+        dest="to_date",
+        metavar="YYYY-MM-DD",
+        help="종료 날짜 (예: 2026-09-30) [조건 2: --from과 함께 지정]",
+    )
 
     imp_p = subparsers.add_parser("import", help="CSV 파일에서 거래를 일괄 등록합니다.")
     imp_p.add_argument("--from", dest="from_file", required=True, help="가져올 CSV 파일 경로")
