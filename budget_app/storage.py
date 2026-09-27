@@ -1,10 +1,14 @@
-# 파일 영구 저장 및 입출력 (JSONL 쓰기/읽기)
+# budget_app/storage.py
+import csv  # <-- 1. csv 모듈 추가
 import json
 import os
 from dataclasses import asdict
-from typing import Generator, Iterable, List
+from typing import Any, Dict, Generator, Iterable, List
 
 from budget_app.models import Budget, Category, Transaction
+
+# CSV 헤더 규격 (물리 저장 포맷이므로 Storage에 배치)
+CSV_HEADERS = ["date", "type", "category", "amount", "memo", "tags"]
 
 
 class Storage:
@@ -91,3 +95,25 @@ class Storage:
         self._atomic_write_jsonl(
             self.budget_file, (asdict(b) for b in budgets)
         )
+
+    # --- CSV 입출력 (Storage 전담 책임으로 신설) ---
+
+    def export_transactions_csv(self, filepath: str, transactions: Iterable[Transaction]) -> int:
+        """거래 목록을 받아 물리 CSV 파일(utf-8-sig)로 기록합니다."""
+        count = 0
+        with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
+            writer = csv.writer(f)
+            writer.writerow(CSV_HEADERS)
+            for tx in transactions:
+                writer.writerow([tx.date, tx.type, tx.category, tx.amount, tx.memo, ",".join(tx.tags)])
+                count += 1
+        return count
+
+    def read_transactions_csv(self, filepath: str) -> Generator[Dict[str, str], None, None]:
+        """물리 CSV 파일에서 한 줄씩 Dict 형태로 스트리밍 읽기를 수행합니다."""
+        if not os.path.exists(filepath):
+            raise FileNotFoundError(f"파일을 찾을 수 없습니다: {filepath}")
+        with open(filepath, "r", encoding="utf-8-sig") as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                yield row

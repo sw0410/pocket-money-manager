@@ -274,7 +274,7 @@ class BudgetService:
         from_date: Optional[str] = None,
         to_date: Optional[str] = None,
     ) -> int:
-        """조건에 맞는 거래를 CSV 파일(utf-8-sig)로 내보냅니다."""
+        """조건에 맞는 거래를 검색(도메인 규칙)한 뒤 Storage에 CSV 저장을 위임합니다."""
         if not month and not (from_date and to_date):
             raise ValueError("내보내기 조건으로 --month 또는 (--from 및 --to)가 필수입니다.")
 
@@ -282,40 +282,37 @@ class BudgetService:
         if month:
             results = [tx for tx in results if tx.date.startswith(month)]
 
-        with open(filepath, "w", newline="", encoding="utf-8-sig") as f:
-            writer = csv.writer(f)
-            writer.writerow(CSV_HEADERS)
-            for tx in results:
-                writer.writerow([tx.date, tx.type, tx.category, tx.amount, tx.memo, ",".join(tx.tags)])
-        return len(results)
+        # 직접 open()하지 않고 Storage에 저장 위임
+        return self.storage.export_transactions_csv(filepath, results)
 
     def import_csv(self, filepath: str) -> Tuple[int, int]:
-        """CSV 파일에서 거래를 읽어 유효한 행만 추가 등록합니다. (성공 수, 실패 수 반환)"""
+        """Storage로부터 읽어온 CSV 행 데이터를 도메인 규칙에 따라 검증 및 등록합니다."""
         success_count = 0
         skip_count = 0
-        with open(filepath, "r", encoding="utf-8-sig") as f:
-            reader = csv.DictReader(f)
-            for row in reader:
-                try:
-                    date_str = row["date"].strip()
-                    tx_type = row["type"].strip()
-                    category = row["category"].strip()
-                    amount = int(row["amount"].strip())
-                    memo = row.get("memo", "").strip()
-                    tags = parse_tags(row.get("tags", "").strip())
 
-                    cats = {c.name for c in self.storage.load_categories()}
-                    if category not in cats:
-                        self.add_category(category)
-                    self.add_transaction(
-                        date_str=date_str,
-                        tx_type=tx_type,
-                        category=category,
-                        amount=amount,
-                        memo=memo,
-                        tags=tags,
-                    )
-                    success_count += 1
-                except Exception:
-                    skip_count += 1
+        # 직접 open()하지 않고 Storage의 스트림을 가져와 규칙 검증만 수행
+        for row in self.storage.read_transactions_csv(filepath):
+            try:
+                date_str = row["date"].strip()
+                tx_type = row["type"].strip()
+                category = row["category"].strip()
+                amount = int(row["amount"].strip())
+                memo = row.get("memo", "").strip()
+                tags = parse_tags(row.get("tags", "").strip())
+
+                cats = {c.name for c in self.storage.load_categories()}
+                if category not in cats:
+                    self.add_category(category)
+                self.add_transaction(
+                    date_str=date_str,
+                    tx_type=tx_type,
+                    category=category,
+                    amount=amount,
+                    memo=memo,
+                    tags=tags,
+                )
+                success_count += 1
+            except Exception:
+                skip_count += 1
+
         return success_count, skip_count
