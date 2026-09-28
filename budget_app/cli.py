@@ -2,7 +2,6 @@
 import argparse
 import sys
 from datetime import date
-from typing import Optional
 
 from budget_app.decorators import handle_cli_errors
 from budget_app.models import Transaction
@@ -66,7 +65,6 @@ def create_parser() -> argparse.ArgumentParser:
     c_remove = c_subs.add_parser("remove", help="카테고리 삭제")
     c_remove.add_argument("--id", type=int, required=True, help="삭제할 카테고리 ID")
 
-
     exp_p = subparsers.add_parser("export", help="조건에 맞는 거래를 CSV로 내보냅니다.")
     exp_p.add_argument(
         "--out",
@@ -101,7 +99,9 @@ def handle_add_interactive(service: BudgetService) -> None:
     """대화형으로 순차 입력받아 거래를 추가합니다."""
     print("=== 새 거래 내역 등록 (대화형) ===")
     today_str = date.today().strftime("%Y-%m-%d")
-    date_val = input(f"1. 날짜 (YYYY-MM-DD, 기본값: {today_str}): ").strip() or today_str
+    date_val = input(f"1. 날짜 (YYYY-MM-DD, 기본값: {today_str}): ").strip()
+    if not date_val:
+        date_val = today_str
 
     while True:
         type_val = input("2. 타입 (income / expense): ").strip().lower()
@@ -130,7 +130,14 @@ def handle_add_interactive(service: BudgetService) -> None:
 
     memo_val = input("5. 메모 (선택, 미입력 시 엔터): ").strip()
     tag_list = parse_tags(input("6. 태그 (선택, 쉼표 구분 e.g. 외식,점심): ").strip())
-    tx = service.add_transaction(date_str=date_val, tx_type=type_val, category=cat_val, amount=amt_val, memo=memo_val, tags=tag_list)
+    tx = service.add_transaction(
+        date_str=date_val,
+        tx_type=type_val,
+        category=cat_val,
+        amount=amt_val,
+        memo=memo_val,
+        tags=tag_list,
+    )
     print(f"\n[성공] 거래가 등록되었습니다. (발급된 ID: {tx.id})")
 
 
@@ -145,7 +152,10 @@ def print_transaction_table(transactions: list[Transaction], title: str) -> None
     for tx in transactions:
         type_str = "수입" if tx.type == "income" else "지출"
         tags_str = ", ".join(tx.tags) if tx.tags else ""
-        print(f"{tx.id:<5} | {tx.date:<10} | {type_str:<7} | {tx.category:<10} | {tx.amount:>10,}원 | {tx.memo:<15} | {tags_str}")
+        print(
+            f"{tx.id:<5} | {tx.date:<10} | {type_str:<7} | {tx.category:<10} | "
+            f"{tx.amount:>10,}원 | {tx.memo:<15} | {tags_str}"
+        )
 
 
 @handle_cli_errors
@@ -164,10 +174,23 @@ def main() -> None:
     if args.command == "add":
         handle_add_interactive(service)
     elif args.command == "list":
-        print_transaction_table(service.list_transactions(limit=args.limit), f"최근 거래 내역 (최대 {args.limit}건)")
+        print_transaction_table(
+            service.list_transactions(limit=args.limit),
+            f"최근 거래 내역 (최대 {args.limit}건)",
+        )
     elif args.command == "update":
-        tags_list = parse_tags(args.tags) if args.tags is not None else None
-        updated = service.update_transaction(tx_id=args.id, date=args.date, type=args.type, category=args.category, amount=args.amount, memo=args.memo, tags=tags_list)
+        tags_list = None
+        if args.tags is not None:
+            tags_list = parse_tags(args.tags)
+        updated = service.update_transaction(
+            tx_id=args.id,
+            date=args.date,
+            tx_type=args.type,
+            category=args.category,
+            amount=args.amount,
+            memo=args.memo,
+            tags=tags_list,
+        )
         print(f"[성공] ID {updated.id}번 거래가 정상 수정되었습니다.")
     elif args.command == "delete":
         if service.delete_transaction(args.id):
@@ -175,7 +198,14 @@ def main() -> None:
         else:
             raise ValueError(f"ID {args.id}에 해당하는 거래 내역이 없습니다.")
     elif args.command == "search":
-        results = service.search_transactions(from_date=args.from_date, to_date=args.to_date, category=args.category, tx_type=args.type, q=args.q, tag=args.tag)
+        results = service.search_transactions(
+            from_date=args.from_date,
+            to_date=args.to_date,
+            category=args.category,
+            tx_type=args.type,
+            q=args.q,
+            tag=args.tag,
+        )
         print_transaction_table(results, "검색 결과")
     elif args.command == "summary":
         res = service.get_summary(month=args.month, top_n=args.top)
@@ -190,7 +220,10 @@ def main() -> None:
             print("\n[예산 분석]")
             print(f"- 설정 예산: {res['budget']:,}원")
             print(f"- 예산 사용률: {res['usage_rate']}%")
-            print("⚠️ [경고] 설정된 예산을 초과하여 지출했습니다!" if res["is_over_budget"] else "✅ 예산 범위 내에서 안정적으로 지출하고 있습니다.")
+            if res["is_over_budget"]:
+                print("⚠️ [경고] 설정된 예산을 초과하여 지출했습니다!")
+            else:
+                print("✅ 예산 범위 내에서 안정적으로 지출하고 있습니다.")
         if res["top_categories"]:
             print(f"\n[지출 상위 TOP {len(res['top_categories'])} 카테고리]")
             for rank, (cat, total) in enumerate(res["top_categories"], start=1):
@@ -215,7 +248,12 @@ def main() -> None:
         else:
             print("사용법: python -m budget_app category [list|add|remove] ...")
     elif args.command == "export":
-        count = service.export_csv(filepath=args.out, month=args.month, from_date=args.from_date, to_date=args.to_date)
+        count = service.export_csv(
+            filepath=args.out,
+            month=args.month,
+            from_date=args.from_date,
+            to_date=args.to_date,
+        )
         print(f"[성공] 총 {count}건의 거래 내역을 '{args.out}'(으)로 내보냈습니다.")
     elif args.command == "import":
         ok, skipped = service.import_csv(args.from_file)
