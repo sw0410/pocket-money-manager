@@ -45,6 +45,12 @@ class Storage:
         temp_path = f"{self.cat_file}.tmp"
         with open(temp_path, "w", encoding="utf-8") as f:
             json.dump([asdict(c) for c in categories], f, ensure_ascii=False, indent=2)
+
+        # # --- 여기서 고의로 사고를 냅니다! ---
+        # print("\n[실험] 데이터를 다 썼지만, 아직 교체하기 직전에 정전이 났다고 가정합니다!")
+        # raise Exception("강제 종료!") 
+        # # ----------------------------------
+
         os.replace(temp_path, self.cat_file)
 
     # --- 예산 입출력 ---

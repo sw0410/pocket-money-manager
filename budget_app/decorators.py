@@ -10,7 +10,7 @@ def handle_cli_errors(func: Callable) -> Callable:
     
     요구사항 명세:
     - 오류는 스택트레이스 대신 원인 + 해결 힌트로 출력한다.
-    - 정상 종료는 0, 오류 종료는 0이 아닌 값(1)으로 종료한다.
+    - 정상 종료는 0, 오류 종료는 1, 강제종료는 130으로 종료한다.
     """
     @wraps(func)
     def wrapper(*args: Any, **kwargs: Any) -> Any:
