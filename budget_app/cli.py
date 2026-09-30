@@ -8,6 +8,10 @@ from budget_app.models import Transaction
 from budget_app.services import BudgetService, parse_tags
 from budget_app.storage import Storage
 
+def handle_list(args: argparse.Namespace, service: BudgetService) -> None:
+    """list 명령어를 처리하는 핸들러"""
+    txs = service.list_transactions(limit=args.limit)
+    print_transaction_table(txs, f"최근 거래 내역 (최대 {args.limit}건)")
 
 def create_parser() -> argparse.ArgumentParser:
     """argparse 서브커맨드 및 옵션 파서를 정의합니다."""
@@ -174,10 +178,8 @@ def main() -> None:
     if args.command == "add":
         handle_add_interactive(service)
     elif args.command == "list":
-        print_transaction_table(
-            service.list_transactions(limit=args.limit),
-            f"최근 거래 내역 (최대 {args.limit}건)",
-        )
+        handle_list(args, service)
+    
     elif args.command == "update":
         tags_list = None
         if args.tags is not None:
