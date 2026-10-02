@@ -13,6 +13,96 @@ def handle_list(args: argparse.Namespace, service: BudgetService) -> None:
     txs = service.list_transactions(limit=args.limit)
     print_transaction_table(txs, f"최근 거래 내역 (최대 {args.limit}건)")
 
+def handle_delete(args: argparse.Namespace, service: BudgetService) -> None:
+    """delete 명령어를 처리하는 핸들러"""
+    if service.delete_transaction(args.id):
+        print(f"[성공] ID {args.id}번 거래가 삭제되었습니다.")
+    else:
+        raise ValueError(f"ID {args.id}에 해당하는 거래 내역이 없습니다.")
+
+def handle_update(args: argparse.Namespace, service: BudgetService) -> None:
+    """update 명령어를 처리하는 핸들러"""
+    tags_list = None
+    if args.tags is not None:
+        tags_list = parse_tags(args.tags)
+    updated = service.update_transaction(
+        tx_id=args.id,
+        date=args.date,
+        tx_type=args.type,
+        category=args.category,
+        amount=args.amount,
+        memo=args.memo,
+        tags=tags_list,
+    )
+    print(f"[성공] ID {updated.id}번 거래가 정상 수정되었습니다.")
+
+def handle_search(args: argparse.Namespace, service: BudgetService) -> None:
+    """search 명령어를 처리하는 핸들러"""
+    results = service.search_transactions(
+        from_date=args.from_date,
+        to_date=args.to_date,
+        category=args.category,
+        tx_type=args.type,
+        q=args.q,
+        tag=args.tag,
+    )
+    print_transaction_table(results, "검색 결과")
+
+def handle_summary(args: argparse.Namespace, service: BudgetService) -> None:
+    """summary 명령어를 처리하는 핸들러"""
+    res = service.get_summary(month=args.month, top_n=args.top)
+    print(f"\n=== {res['month']} 가계부 요약 리포트 ===")
+    if not res["has_data"]:
+        print("데이터 없음 (해당 월의 거래 기록이 없습니다.)")
+        return
+    print(f"총 수입: {res['total_income']:,}원")
+    print(f"총 지출: {res['total_expense']:,}원")
+    print(f"순 잔액(수입 - 지출): {res['balance']:,}원")
+    if res["budget"] is not None:
+        print("\n[예산 분석]")
+        print(f"- 설정 예산: {res['budget']:,}원")
+        print(f"- 예산 사용률: {res['usage_rate']}%")
+        if res["is_over_budget"]:
+            print("⚠️ [경고] 설정된 예산을 초과하여 지출했습니다!")
+        else:
+            print("✅ 예산 범위 내에서 안정적으로 지출하고 있습니다.")
+    if res["top_categories"]:
+        print(f"\n[지출 상위 TOP {len(res['top_categories'])} 카테고리]")
+        for rank, (cat, total) in enumerate(res["top_categories"], start=1):
+            print(f"  {rank}. {cat}: {total:,}원")
+
+def handle_category(args: argparse.Namespace, service: BudgetService) -> None:
+    """category 명령어를 처리하는 핸들러"""
+    if args.cat_action == "list":
+        print("\n--- 등록된 카테고리 목록 ---")
+        for c in service.list_categories():
+            print(f"ID: {c.id:<3} | 이름: {c.name}")
+    elif args.cat_action == "add":
+        new_cat = service.add_category(args.name)
+        print(f"[성공] 카테고리 '{new_cat.name}'(ID: {new_cat.id})이(가) 등록되었습니다.")
+    elif args.cat_action == "remove":
+        service.remove_category(args.id)
+        print(f"[성공] ID {args.id}번 카테고리가 삭제되었습니다.")
+    else:
+        print("사용법: python -m budget_app category [list|add|remove] ...")
+
+
+def handle_export(args: argparse.Namespace, service: BudgetService) -> None:
+    """export 명령어를 처리하는 핸들러"""
+    count = service.export_csv(
+        filepath=args.out,
+        month=args.month,
+        from_date=args.from_date,
+        to_date=args.to_date,
+    )
+    print(f"[성공] 총 {count}건의 거래 내역을 '{args.out}'(으)로 내보냈습니다.")
+
+
+def handle_import(args: argparse.Namespace, service: BudgetService) -> None:
+    """import 명령어를 처리하는 핸들러"""
+    ok, skipped = service.import_csv(args.from_file)
+    print(f"[완료] CSV 가져오기 결과: 성공 {ok}건, 실패/건너뜀 {skipped}건")
+
 def create_parser() -> argparse.ArgumentParser:
     """argparse 서브커맨드 및 옵션 파서를 정의합니다."""
     parser = argparse.ArgumentParser(
@@ -24,12 +114,15 @@ def create_parser() -> argparse.ArgumentParser:
         default="./data",
         help="데이터 저장 디렉터리 경로 (기본값: ./data)",
     )
-
+    # 기존: subparsers.add_parser("add", ...)
+    # 수정 후:
     subparsers = parser.add_subparsers(dest="command", help="실행할 명령")
     subparsers.add_parser("add", help="대화형으로 새 거래 내역을 등록합니다.")
-
+    add_p = subparsers.add_parser("add", help="대화형으로 새 거래 내역을 등록합니다.")
+    add_p.set_defaults(func=handle_add_interactive)
     list_p = subparsers.add_parser("list", help="최신순으로 거래 목록을 조회합니다.")
     list_p.add_argument("--limit", type=int, default=20, help="출력할 최대 건수 (기본값: 20)")
+    list_p.set_defaults(func=handle_list)
 
     update_p = subparsers.add_parser("update", help="특정 거래 내역을 수정합니다.")
     update_p.add_argument("--id", type=int, required=True, help="수정할 거래 ID")
@@ -39,9 +132,11 @@ def create_parser() -> argparse.ArgumentParser:
     update_p.add_argument("--amount", type=int, help="수정할 금액")
     update_p.add_argument("--memo", help="수정할 메모")
     update_p.add_argument("--tags", help="수정할 태그 (쉼표 구분)")
+    update_p.set_defaults(func=handle_update)
 
     delete_p = subparsers.add_parser("delete", help="특정 거래 내역을 삭제합니다.")
     delete_p.add_argument("--id", type=int, required=True, help="삭제할 거래 ID")
+    delete_p.set_defaults(func=handle_delete)
 
     search_p = subparsers.add_parser("search", help="조건에 맞는 거래를 검색합니다.")
     search_p.add_argument("--from", dest="from_date", help="시작 날짜 (YYYY-MM-DD)")
@@ -50,10 +145,12 @@ def create_parser() -> argparse.ArgumentParser:
     search_p.add_argument("--type", help="거래 타입 (income / expense)")
     search_p.add_argument("--q", help="메모 검색 키워드")
     search_p.add_argument("--tag", help="검색할 태그")
+    search_p.set_defaults(func=handle_search)
 
     sum_p = subparsers.add_parser("summary", help="해당 월의 가계부 및 예산 요약을 출력합니다.")
     sum_p.add_argument("--month", required=True, help="조회할 대상 월 (YYYY-MM)")
     sum_p.add_argument("--top", type=int, default=5, help="지출 상위 카테고리 개수 (기본값: 5)")
+    sum_p.set_defaults(func=handle_summary)
 
     budget_p = subparsers.add_parser("budget", help="예산 관리 명령")
     b_subs = budget_p.add_subparsers(dest="budget_action", help="예산 하위 명령")
@@ -62,6 +159,7 @@ def create_parser() -> argparse.ArgumentParser:
     b_set.add_argument("--amount", type=int, required=True, help="예산 금액 (양수 정수)")
 
     cat_p = subparsers.add_parser("category", help="카테고리 관리 명령")
+    cat_p.set_defaults(func=handle_category)
     c_subs = cat_p.add_subparsers(dest="cat_action", help="카테고리 하위 명령")
     c_subs.add_parser("list", help="카테고리 목록 조회")
     c_add = c_subs.add_parser("add", help="카테고리 추가")
@@ -93,13 +191,15 @@ def create_parser() -> argparse.ArgumentParser:
         metavar="YYYY-MM-DD",
         help="종료 날짜 (예: 2026-09-30) [조건 2: --from과 함께 지정]",
     )
+    exp_p.set_defaults(func=handle_export)
 
     imp_p = subparsers.add_parser("import", help="CSV 파일에서 거래를 일괄 등록합니다.")
     imp_p.add_argument("--from", dest="from_file", required=True, help="가져올 CSV 파일 경로")
+    imp_p.set_defaults(func=handle_import)
     return parser
 
 
-def handle_add_interactive(service: BudgetService) -> None:
+def handle_add_interactive(args: argparse.Namespace, service: BudgetService) -> None:
     """대화형으로 순차 입력받아 거래를 추가합니다."""
     print("=== 새 거래 내역 등록 (대화형) ===")
     today_str = date.today().strftime("%Y-%m-%d")
@@ -175,88 +275,5 @@ def main() -> None:
     service = BudgetService(storage)
     service.ensure_default_categories()
 
-    if args.command == "add":
-        handle_add_interactive(service)
-    elif args.command == "list":
-        handle_list(args, service)
-    
-    elif args.command == "update":
-        tags_list = None
-        if args.tags is not None:
-            tags_list = parse_tags(args.tags)
-        updated = service.update_transaction(
-            tx_id=args.id,
-            date=args.date,
-            tx_type=args.type,
-            category=args.category,
-            amount=args.amount,
-            memo=args.memo,
-            tags=tags_list,
-        )
-        print(f"[성공] ID {updated.id}번 거래가 정상 수정되었습니다.")
-    elif args.command == "delete":
-        if service.delete_transaction(args.id):
-            print(f"[성공] ID {args.id}번 거래가 삭제되었습니다.")
-        else:
-            raise ValueError(f"ID {args.id}에 해당하는 거래 내역이 없습니다.")
-    elif args.command == "search":
-        results = service.search_transactions(
-            from_date=args.from_date,
-            to_date=args.to_date,
-            category=args.category,
-            tx_type=args.type,
-            q=args.q,
-            tag=args.tag,
-        )
-        print_transaction_table(results, "검색 결과")
-    elif args.command == "summary":
-        res = service.get_summary(month=args.month, top_n=args.top)
-        print(f"\n=== {res['month']} 가계부 요약 리포트 ===")
-        if not res["has_data"]:
-            print("데이터 없음 (해당 월의 거래 기록이 없습니다.)")
-            return
-        print(f"총 수입: {res['total_income']:,}원")
-        print(f"총 지출: {res['total_expense']:,}원")
-        print(f"순 잔액(수입 - 지출): {res['balance']:,}원")
-        if res["budget"] is not None:
-            print("\n[예산 분석]")
-            print(f"- 설정 예산: {res['budget']:,}원")
-            print(f"- 예산 사용률: {res['usage_rate']}%")
-            if res["is_over_budget"]:
-                print("⚠️ [경고] 설정된 예산을 초과하여 지출했습니다!")
-            else:
-                print("✅ 예산 범위 내에서 안정적으로 지출하고 있습니다.")
-        if res["top_categories"]:
-            print(f"\n[지출 상위 TOP {len(res['top_categories'])} 카테고리]")
-            for rank, (cat, total) in enumerate(res["top_categories"], start=1):
-                print(f"  {rank}. {cat}: {total:,}원")
-    elif args.command == "budget":
-        if args.budget_action == "set":
-            b = service.set_budget(month=args.month, amount=args.amount)
-            print(f"[성공] {b.month} 예산이 {b.amount:,}원으로 설정되었습니다.")
-        else:
-            print("사용법: python -m budget_app budget set --month YYYY-MM --amount <금액>")
-    elif args.command == "category":
-        if args.cat_action == "list":
-            print("\n--- 등록된 카테고리 목록 ---")
-            for c in service.list_categories():
-                print(f"ID: {c.id:<3} | 이름: {c.name}")
-        elif args.cat_action == "add":
-            new_cat = service.add_category(args.name)
-            print(f"[성공] 카테고리 '{new_cat.name}'(ID: {new_cat.id})이(가) 등록되었습니다.")
-        elif args.cat_action == "remove":
-            service.remove_category(args.id)
-            print(f"[성공] ID {args.id}번 카테고리가 삭제되었습니다.")
-        else:
-            print("사용법: python -m budget_app category [list|add|remove] ...")
-    elif args.command == "export":
-        count = service.export_csv(
-            filepath=args.out,
-            month=args.month,
-            from_date=args.from_date,
-            to_date=args.to_date,
-        )
-        print(f"[성공] 총 {count}건의 거래 내역을 '{args.out}'(으)로 내보냈습니다.")
-    elif args.command == "import":
-        ok, skipped = service.import_csv(args.from_file)
-        print(f"[완료] CSV 가져오기 결과: 성공 {ok}건, 실패/건너뜀 {skipped}건")
+    args.func(args, service)
+
