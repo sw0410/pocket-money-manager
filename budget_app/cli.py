@@ -117,7 +117,6 @@ def create_parser() -> argparse.ArgumentParser:
     # 기존: subparsers.add_parser("add", ...)
     # 수정 후:
     subparsers = parser.add_subparsers(dest="command", help="실행할 명령")
-    subparsers.add_parser("add", help="대화형으로 새 거래 내역을 등록합니다.")
     add_p = subparsers.add_parser("add", help="대화형으로 새 거래 내역을 등록합니다.")
     add_p.set_defaults(func=handle_add_interactive)
     list_p = subparsers.add_parser("list", help="최신순으로 거래 목록을 조회합니다.")
