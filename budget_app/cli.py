@@ -5,7 +5,7 @@ from datetime import date
 
 from budget_app.decorators import handle_cli_errors
 from budget_app.models import Transaction
-from budget_app.services import BudgetService, parse_tags
+from budget_app.services import BudgetService, parse_tags, validate_date
 from budget_app.storage import Storage
 
 def handle_list(args: argparse.Namespace, service: BudgetService) -> None:
@@ -103,6 +103,13 @@ def handle_import(args: argparse.Namespace, service: BudgetService) -> None:
     ok, skipped = service.import_csv(args.from_file)
     print(f"[완료] CSV 가져오기 결과: 성공 {ok}건, 실패/건너뜀 {skipped}건")
 
+def handle_budget_set(args: argparse.Namespace, service: BudgetService) -> None:
+    """budget set 명령어를 처리하는 핸들러"""
+    budget = service.set_budget(month=args.month, amount=args.amount)
+    print(f"[성공] {budget.month} 예산이 {budget.amount:,}원으로 설정되었습니다.")
+
+
+
 def create_parser() -> argparse.ArgumentParser:
     """argparse 서브커맨드 및 옵션 파서를 정의합니다."""
     parser = argparse.ArgumentParser(
@@ -156,6 +163,7 @@ def create_parser() -> argparse.ArgumentParser:
     b_set = b_subs.add_parser("set", help="월별 목표 예산 설정")
     b_set.add_argument("--month", required=True, help="대상 월 (YYYY-MM)")
     b_set.add_argument("--amount", type=int, required=True, help="예산 금액 (양수 정수)")
+    b_set.set_defaults(func=handle_budget_set)
 
     cat_p = subparsers.add_parser("category", help="카테고리 관리 명령")
     cat_p.set_defaults(func=handle_category)
@@ -202,9 +210,15 @@ def handle_add_interactive(args: argparse.Namespace, service: BudgetService) -> 
     """대화형으로 순차 입력받아 거래를 추가합니다."""
     print("=== 새 거래 내역 등록 (대화형) ===")
     today_str = date.today().strftime("%Y-%m-%d")
-    date_val = input(f"1. 날짜 (YYYY-MM-DD, 기본값: {today_str}): ").strip()
-    if not date_val:
-        date_val = today_str
+    while True:
+        date_val = input(f"1. 날짜 (YYYY-MM-DD, 기본값: {today_str}): ").strip()
+        if not date_val:
+            date_val = today_str
+        try:
+            validate_date(date_val)
+            break
+        except ValueError as e:
+            print(f"   [오류] {e}")
 
     while True:
         type_val = input("2. 타입 (income / expense): ").strip().lower()
